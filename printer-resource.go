@@ -2,7 +2,9 @@ package main
 
 import (
 	"bufio"
+	"fmt"
 	"net"
+	"strconv"
 	"time"
 
 	"github.com/seer-robotics/escpos"
@@ -13,11 +15,10 @@ func NewPrinterService() (*printerService, error) {
 	d := net.Dialer{
 		Timeout: time.Second * 3,
 	}
-	psock, err := d.Dial("tcp", "localhost:1026")
+	psock, err := d.Dial("tcp", "localhost:9100")
 	if err != nil {
 		return nil, err
 	}
-	// defer psock.Close()
 
 	//create a writer for us to add to on the socket
 	pw := bufio.NewWriter(psock)
@@ -51,10 +52,19 @@ func (p *printerService) printer(orderChan <-chan Order) {
 	for order := range orderChan {
 		p.pr.Verbose = true
 		p.pr.Init()
-		p.pr.Beep(8)
-		p.pr.Formfeed()
-		p.pr.Write(order.name)
-		p.pr.Formfeed()
+		p.pr.Write(order.ID)
+		p.pr.Linefeed()
+		for _, mi := range order.OrderedItems {
+			p.pr.SetAlign("left")
+			p.pr.Write(mi.Name)
+			p.pr.SetAlign("right")
+			p.pr.Write(strconv.Itoa(mi.Price))
+			p.pr.Linefeed()
+		}
+		p.pr.Write("Order Created:")
+		p.pr.Linefeed()
+		p.pr.Write(fmt.Sprintf("%02d:%02d:%02d", order.SubmittedTime.Local().Hour(), order.SubmittedTime.Local().Minute(), order.SubmittedTime.Local().Second()))
+		p.pr.Linefeed()
 		p.pr.Cut()
 		p.pw.Flush()
 		time.Sleep(3 * time.Second)
