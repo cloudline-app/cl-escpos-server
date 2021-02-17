@@ -5,7 +5,7 @@ import (
 	"log"
 	"net/http"
 	"time"
-
+	"github.com/go-chi/cors"
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
 )
@@ -19,6 +19,17 @@ func main() {
 
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
+
+	r.Use(cors.Handler(cors.Options{
+		// AllowedOrigins: []string{"https://foo.com"}, // Use this to allow specific origin hosts
+		AllowedOrigins:   []string{"*"},
+		// AllowOriginFunc:  func(r *http.Request, origin string) bool { return true },
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"Accept", "Access-Control-Allow-Origin", "Authorization", "Content-Type", "X-CSRF-Token"},
+		ExposedHeaders:   []string{"Link"},
+		AllowCredentials: false,
+		MaxAge:           300, // Maximum value not ignored by any of major browsers
+	  }))
 
 	r.Mount("/print", printerResource{p: ps}.Routes())
 
@@ -82,7 +93,10 @@ func (pr printerResource) Routes() chi.Router {
 		// 	},
 		// }
 		pr.p.AddToPrintQueue(o)
-		w.WriteHeader(http.StatusOK)
+		// w.WriteHeader(http.StatusOK)
+
+		w.Write([]byte("welcome"))
+
 		return
 	})
 	return r
