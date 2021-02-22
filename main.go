@@ -93,9 +93,8 @@ func (pr printerResource) Routes() chi.Router {
 		// 	},
 		// }
 		pr.p.AddToPrintQueue(o)
-		// w.WriteHeader(http.StatusOK)
+		w.WriteHeader(http.StatusOK)
 
-		w.Write([]byte("welcome"))
 
 		return
 	})
