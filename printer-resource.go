@@ -10,13 +10,18 @@ import (
 	"github.com/seer-robotics/escpos"
 )
 
-func NewPrinterService() (*printerService, error) {
+func NewPrinterService(address string, port int) (*printerService, error) {
 
 	d := net.Dialer{
 		Timeout: time.Second * 3,
 	}
-	psock, err := d.Dial("tcp", "localhost:9100")
+
+	fmt.Printf("Connecting to printer at: %s:%d \n", address, port)
+
+	daddress := address + ":" + strconv.Itoa(port)
+	psock, err := d.Dial("tcp", daddress)
 	if err != nil {
+		fmt.Printf("Failed to connect to printer at: %s:%d \n", address, port)
 		return nil, err
 	}
 
