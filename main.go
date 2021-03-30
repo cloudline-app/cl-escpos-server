@@ -60,7 +60,7 @@ type Order struct {
 	VisitorID        string             `json:"visitorID"`
 	OrganisationID   string             `json:"organizationID"`
 	Type             string             `json:"orderType"`
-	OrderInformation []OrderInformation `json:"orderInformation"`
+	OrderInformation []OrderInformation `json:"deliveryInformation"`
 	OrderedItems     []MenuItem         `json:"items"`
 	SubmittedTime    *time.Time         `json:"orderSubmittedTime"`
 }
@@ -93,17 +93,13 @@ func (pr printerResource) Routes() chi.Router {
 		decoder := json.NewDecoder(r.Body)
 		err := decoder.Decode(&o)
 		if err != nil {
+			fmt.Printf("%s\n", err.Error())
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
-		// o := Order{
-		// 	ID: "testorderID",
-		// 	OrderInformation: []OrderInformation{
-		// 		{Question: "this is a question?", AnswerString: "test"},
-		// 		{Question: "this is a question as well?", AnswerNumber: 2},
-		// 	},
-		// }
+		fmt.Printf("%+v/n", o)
+
 		pr.p.AddToPrintQueue(o)
 		w.WriteHeader(http.StatusOK)
 

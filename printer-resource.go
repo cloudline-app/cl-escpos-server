@@ -55,23 +55,63 @@ func (p *printerService) AddToPrintQueue(o Order) error {
 
 func (p *printerService) printer(orderChan <-chan Order) {
 	for order := range orderChan {
+		t := fmt.Sprintf("%02d:%02d", order.SubmittedTime.Local().Hour(), order.SubmittedTime.Local().Minute())
 		p.pr.Verbose = true
 		p.pr.Init()
-		p.pr.Write(order.ID)
+
+		p.pr.SetAlign("center")
+		p.pr.SetFontSize(1, 1)
+		p.pr.SetEmphasize(1)
+		p.pr.Write("Tulleys Drive In Movies")
+		p.pr.SetEmphasize(0)
 		p.pr.Linefeed()
-		for _, mi := range order.OrderedItems {
-			p.pr.SetAlign("left")
-			p.pr.Write(mi.Name)
-			p.pr.SetAlign("right")
-			p.pr.Write(strconv.Itoa(mi.Price))
-			p.pr.Linefeed()
+		p.pr.Linefeed()
+
+		writeLargeItem(p.pr, "Order ID", order.ID)
+		writeLargeItem(p.pr, "Order Time", t)
+
+		for _, o := range order.OrderInformation {
+			writeOrderInformation(p.pr, o)
 		}
-		p.pr.Write("Order Created:")
-		p.pr.Linefeed()
-		p.pr.Write(fmt.Sprintf("%02d:%02d:%02d", order.SubmittedTime.Local().Hour(), order.SubmittedTime.Local().Minute(), order.SubmittedTime.Local().Second()))
-		p.pr.Linefeed()
+
+		writeOrderItems(p.pr, order.OrderedItems)
+
 		p.pr.Cut()
 		p.pw.Flush()
-		time.Sleep(3 * time.Second)
 	}
+}
+
+func writeOrderInformation(p *escpos.Escpos, o OrderInformation) {
+	if o.AnswerString != "" {
+		writeLargeItem(p, o.Question, o.AnswerString)
+	}
+	if o.AnswerNumber != 0 {
+		writeLargeItem(p, o.Question, strconv.Itoa(o.AnswerNumber))
+	}
+}
+
+func writeOrderItems(p *escpos.Escpos, mis []MenuItem) {
+	for _, mi := range mis {
+		price := float32(mi.Price)
+		p.SetAlign("left")
+		p.SetEmphasize(1)
+		p.Write(mi.Name + " ")
+		p.SetEmphasize(0)
+		p.WriteWEU(fmt.Sprintf("£%.2f", (price / 100)))
+		p.Linefeed()
+	}
+}
+
+func writeLargeItem(p *escpos.Escpos, header string, value string) {
+	p.SetFontSize(1, 1)
+	p.SetEmphasize(0)
+	p.Write(header)
+	p.Linefeed()
+	p.SetFontSize(2, 2)
+	p.SetEmphasize(1)
+	p.Write(value)
+	p.SetEmphasize(0)
+	p.SetFontSize(1, 1)
+	p.Linefeed()
+	p.Linefeed()
 }
