@@ -13,36 +13,11 @@ import (
 
 func NewPrinterService(address string, port int) (*printerService, error) {
 
-	d := net.Dialer{
-		Timeout:   time.Second * 5,
-		KeepAlive: time.Second * 15,
-	}
-
-	fmt.Printf("Connecting to printer at: %s:%d \n", address, port)
-
 	daddress := address + ":" + strconv.Itoa(port)
-	psock, err := d.Dial("tcp", daddress)
-	if err != nil {
-		fmt.Printf("Failed to connect to printer at: %s:%d \n", address, port)
-		return nil, err
-	}
-
-	err = psock.(*net.TCPConn).SetKeepAlive(true)
-	if err != nil {
-		fmt.Printf("Failed to set keepalive connection to printer at: %s:%d \n", address, port)
-		return nil, err
-	}
-
-	//create a writer for us to add to on the socket
-	pw := bufio.NewWriter(psock)
-
-	//create a printer to write to
-	pr := escpos.New(pw)
 
 	ps := printerService{
-		pr:        pr,
-		pw:        pw,
 		orderChan: make(chan Order, 10000),
+		address:   daddress,
 	}
 
 	go ps.printer(ps.orderChan)
@@ -54,6 +29,7 @@ type printerService struct {
 	pr        *escpos.Escpos
 	pw        *bufio.Writer
 	orderChan chan Order
+	address   string
 }
 
 func (p *printerService) AddToPrintQueue(o Order) error {
@@ -63,19 +39,44 @@ func (p *printerService) AddToPrintQueue(o Order) error {
 
 func (p *printerService) printer(orderChan <-chan Order) {
 	for order := range orderChan {
+
+		d := net.Dialer{
+			Timeout:   time.Second * 5,
+			KeepAlive: time.Second * 15,
+		}
+
+		fmt.Printf("Connecting to printer at: %s \n", p.address)
+
+		psock, err := d.Dial("tcp", p.address)
+		if err != nil {
+			fmt.Printf("Failed to connect to printer at: %s \n", p.address)
+			return
+		}
+
+		if err != nil {
+			fmt.Printf("Failed to set keepalive connection to printer at: %s \n", p.address)
+			return
+		}
+
+		//create a writer for us to add to on the socket
+		pw := bufio.NewWriter(psock)
+
+		//create a printer to write to
+		pr := escpos.New(pw)
+
 		t := fmt.Sprintf("%02d:%02d", order.SubmittedTime.Local().Hour(), order.SubmittedTime.Local().Minute())
 		if viper.GetBool("server.debug") == true {
-			p.pr.Verbose = true
+			pr.Verbose = true
 		}
-		p.pr.Init()
+		pr.Init()
 
-		p.pr.SetAlign("center")
-		p.pr.SetFontSize(1, 1)
-		p.pr.SetEmphasize(1)
-		p.pr.Write("Tulleys Drive In Movies")
-		p.pr.SetEmphasize(0)
-		p.pr.Linefeed()
-		p.pr.Linefeed()
+		pr.SetAlign("center")
+		pr.SetFontSize(1, 1)
+		pr.SetEmphasize(1)
+		pr.Write("Tulleys Drive In Movies")
+		pr.SetEmphasize(0)
+		pr.Linefeed()
+		pr.Linefeed()
 
 		shortOrderID := ""
 		if len(order.ID) > 4 {
@@ -84,17 +85,18 @@ func (p *printerService) printer(orderChan <-chan Order) {
 			shortOrderID = order.ID
 		}
 
-		writeLargeItem(p.pr, "Order ID", shortOrderID)
-		writeLargeItem(p.pr, "Order Time", t)
+		writeLargeItem(pr, "Order ID", shortOrderID)
+		writeLargeItem(pr, "Order Time", t)
 
 		for _, o := range order.OrderInformation {
-			writeOrderInformation(p.pr, o)
+			writeOrderInformation(pr, o)
 		}
 
-		writeOrderItems(p.pr, order.OrderedItems)
+		writeOrderItems(pr, order.OrderedItems)
 
-		p.pr.Cut()
-		p.pw.Flush()
+		pr.Cut()
+		pw.Flush()
+		psock.Close()
 	}
 }
 
