@@ -8,12 +8,14 @@ import (
 	"time"
 
 	"github.com/seer-robotics/escpos"
+	"github.com/spf13/viper"
 )
 
 func NewPrinterService(address string, port int) (*printerService, error) {
 
 	d := net.Dialer{
-		Timeout: time.Second * 3,
+		Timeout:   time.Second * 5,
+		KeepAlive: time.Second * 15,
 	}
 
 	fmt.Printf("Connecting to printer at: %s:%d \n", address, port)
@@ -22,6 +24,12 @@ func NewPrinterService(address string, port int) (*printerService, error) {
 	psock, err := d.Dial("tcp", daddress)
 	if err != nil {
 		fmt.Printf("Failed to connect to printer at: %s:%d \n", address, port)
+		return nil, err
+	}
+
+	err = psock.(*net.TCPConn).SetKeepAlive(true)
+	if err != nil {
+		fmt.Printf("Failed to set keepalive connection to printer at: %s:%d \n", address, port)
 		return nil, err
 	}
 
@@ -34,7 +42,7 @@ func NewPrinterService(address string, port int) (*printerService, error) {
 	ps := printerService{
 		pr:        pr,
 		pw:        pw,
-		orderChan: make(chan Order, 1000),
+		orderChan: make(chan Order, 10000),
 	}
 
 	go ps.printer(ps.orderChan)
@@ -56,7 +64,9 @@ func (p *printerService) AddToPrintQueue(o Order) error {
 func (p *printerService) printer(orderChan <-chan Order) {
 	for order := range orderChan {
 		t := fmt.Sprintf("%02d:%02d", order.SubmittedTime.Local().Hour(), order.SubmittedTime.Local().Minute())
-		p.pr.Verbose = true
+		if viper.GetBool("server.debug") == true {
+			p.pr.Verbose = true
+		}
 		p.pr.Init()
 
 		p.pr.SetAlign("center")
@@ -67,7 +77,14 @@ func (p *printerService) printer(orderChan <-chan Order) {
 		p.pr.Linefeed()
 		p.pr.Linefeed()
 
-		writeLargeItem(p.pr, "Order ID", order.ID)
+		shortOrderID := ""
+		if len(order.ID) > 4 {
+			shortOrderID = order.ID[:4]
+		} else {
+			shortOrderID = order.ID
+		}
+
+		writeLargeItem(p.pr, "Order ID", shortOrderID)
 		writeLargeItem(p.pr, "Order Time", t)
 
 		for _, o := range order.OrderInformation {
@@ -91,13 +108,20 @@ func writeOrderInformation(p *escpos.Escpos, o OrderInformation) {
 }
 
 func writeOrderItems(p *escpos.Escpos, mis []MenuItem) {
+
+	dict := make(map[string]int)
 	for _, mi := range mis {
-		price := float32(mi.Price)
+		dict[mi.Name] = dict[mi.Name] + 1
+	}
+
+	for name, number := range dict {
+		// price := float32()
 		p.SetAlign("left")
 		p.SetEmphasize(1)
-		p.Write(mi.Name + " ")
+		p.Write(fmt.Sprintf("%dx ", number))
+		p.Write(name + " ")
 		p.SetEmphasize(0)
-		p.WriteWEU(fmt.Sprintf("£%.2f", (price / 100)))
+		// p.WriteWEU(fmt.Sprintf("£%.2f", (price / 100)))
 		p.Linefeed()
 	}
 }

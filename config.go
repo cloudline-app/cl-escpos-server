@@ -16,6 +16,7 @@ func configSetup() {
 	viper.SetDefault("server.printer_address", "localhost")
 	viper.SetDefault("server.printer_port", 9100)
 	viper.SetDefault("server.port", 3000)
+	viper.SetDefault("server.debug", false)
 
 	viper.SafeWriteConfigAs("settings.yaml")
 	err := viper.ReadInConfig()

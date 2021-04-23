@@ -45,6 +45,22 @@ func main() {
 	sps := ":" + strconv.Itoa(sp)
 
 	fmt.Printf("Server listening on port: %d\n", sp)
+
+	n := time.Now()
+	warmup := Order{
+		ID: "123456",
+		OrderedItems: []MenuItem{
+			{Name: "Warmup1", Price: 100},
+			{Name: "Warmup2", Price: 200},
+		},
+		SubmittedTime: &n,
+	}
+
+	err = ps.AddToPrintQueue(warmup)
+	if err != nil {
+		fmt.Printf("Printer warmup print failed")
+		log.Fatal(err)
+	}
 	http.ListenAndServe(sps, r)
 }
 
@@ -73,7 +89,7 @@ type MenuItem struct {
 type OrderInformation struct {
 	Question     string `json:"question"`
 	AnswerString string `json:"answerString"`
-	AnswerNumber int    `json:"answerNumber"`
+	AnswerNumber int    `json:"answerInt"`
 }
 
 type IPrinter interface {
@@ -98,7 +114,11 @@ func (pr printerResource) Routes() chi.Router {
 			return
 		}
 
-		fmt.Printf("%+v/n", o)
+		if len(o.ID) > 4 {
+			fmt.Printf("New Order: %s \n", o.ID[:4])
+		} else {
+			fmt.Printf("New Order: %s \n", o.ID)
+		}
 
 		pr.p.AddToPrintQueue(o)
 		w.WriteHeader(http.StatusOK)
