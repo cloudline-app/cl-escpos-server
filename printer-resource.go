@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"log"
 	"net"
 	"strconv"
 	"time"
@@ -50,11 +51,13 @@ func (p *printerService) printer(orderChan <-chan Order) {
 		psock, err := d.Dial("tcp", p.address)
 		if err != nil {
 			fmt.Printf("Failed to connect to printer at: %s \n", p.address)
+			log.Fatal(err)
 			return
 		}
 
 		if err != nil {
 			fmt.Printf("Failed to set keepalive connection to printer at: %s \n", p.address)
+			log.Fatal(err)
 			return
 		}
 
